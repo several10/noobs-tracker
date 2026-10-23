@@ -52,7 +52,7 @@ h2{font-size:17px;margin:18px 4px 10px}
 .hero-top .tag{font-size:11px;color:#e6d3b5;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
 .hero-main{display:flex;gap:16px;align-items:center}
 .hero h1,.hero .sub{text-shadow:0 1px 6px rgba(0,0,0,.35)}
-.hero .ring-txt{font-weight:900;font-size:20px;font-family:var(--hfont)}
+.hero .ring-txt{font-weight:900;font-size:16px;font-family:var(--hfont)}
 .hero h1{font-size:17px;line-height:1.2}
 .hero .sub{color:#c9ccd3;font-size:13px;margin:4px 0 10px}
 .pills{display:flex;gap:6px;flex-wrap:wrap}
@@ -69,6 +69,8 @@ h2{font-size:17px;margin:18px 4px 10px}
 .date.on{background:var(--ink);color:#fff;box-shadow:inset 0 -3px 0 var(--acc)}.date.on b{color:#fff}
 .date.done::after{content:"";position:absolute;bottom:5px;left:50%;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--ok)}
 .date.on.done::after{background:#fff}
+.date:disabled{opacity:.35}
+.date.today:not(.on) b{color:var(--acc)}
 
 /* exercise card */
 .ex-head{display:flex;align-items:center;gap:12px}
@@ -179,6 +181,29 @@ nav button.on{color:var(--acc)}
 @keyframes sp{to{transform:rotate(360deg)}}
 .pop{animation:pop .35s}
 @keyframes pop{50%{transform:scale(1.15)}}
+
+/* компактная главная */
+.erow .sp b{display:block;font-size:14px;line-height:1.2;overflow-wrap:anywhere}
+.hero{padding:12px 14px 30px;border-radius:20px}
+.hero .hero-main{gap:12px}
+.hero-top{margin-bottom:4px}
+.hero-top .logo{width:30px;height:30px}
+.hero .sub{margin:2px 0 6px;font-size:12px}
+.hero .mnt{height:24px}
+.dates{margin-bottom:10px}
+.date{padding:6px 0;border-radius:12px}
+.card.ex{padding:10px 12px;margin-bottom:8px;border-radius:16px}
+.card.ex .ico{width:auto;height:auto;background:none;font-size:22px}
+.card.ex .ex-head{gap:10px}
+.card.ex .ex-title b{font-size:15px;line-height:1.2}
+.card.ex .ex-title .hint{font-size:12px}
+.card.ex .ex-today b{font-size:22px}
+.card.ex .bar{height:5px;margin:7px 0}
+.qrow{display:flex;gap:6px}
+.qrow .q{flex:0 0 52px;padding:7px 0;min-width:0}
+.qrow input{flex:1;min-width:0;padding:7px 10px;border-radius:10px}
+.qrow .btn.ok{padding:7px 14px;border-radius:10px}
+.card.ex .chips{margin-top:8px}
 </style>
 </head>
 <body>
@@ -204,7 +229,10 @@ const DEMO = !(tg && tg.initData);
 const SCORE_GOAL = 0.7, SCORE_DAYS = 0.3;
 const UNITS = ['повт','сек','мин','км','м'];
 const QUICK = {'повт':[5,10,15,20,30],'сек':[30,60,90,120,180],'мин':[5,10,15,30],'км':[1,2,3,5],'м':[100,250,500,1000]};
-const DEF_GOAL = {'повт':200,'сек':900,'мин':150,'км':15,'м':3000};
+const DEF_GOAL = {'повт':800,'сек':3600,'мин':600,'км':60,'м':12000};   // цели на месяц
+const QUICK2 = {'повт':[5,10],'сек':[30,60],'мин':[5,10],'км':[1,2],'м':[100,500]};
+const MONTHS = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+const dim = d => { const t = new Date(d+'T00:00:00Z'); return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth()+1, 0)).getUTCDate(); };
 const EMOJIS = ['💪','🦵','🦾','🏋️','🧗','🔥','🪑','⏱️','🦩','🙈','⛰️','🦸','🔁','🏃','🏂','⭐'];
 /* Каталог по умолчанию — должен совпадать с DEFAULT_EXERCISES в Code.gs */
 const EX_DEFAULTS = [['pullups','Подтягивания','повт','🧗'],['pushups','Отжимания','повт','💪'],['abs','Пресс','повт','🔥'],['squats','Приседания','повт','🦵'],
@@ -215,7 +243,7 @@ const LOGO = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEBAY
 const WD = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 
 let S = null;
-let ui = { tab:'today', date:null, weekOff:0, sort:'score', ex:null, newEmoji:'⭐' };
+let ui = { tab:'today', date:null, weekOff:0, sort:'score', ex:null, newEmoji:'⭐', open:null };
 let charts = [];
 
 const $ = s => document.querySelector(s);
@@ -257,7 +285,8 @@ function board(wk){
     const logs = S.log.filter(l=>l.userId===u.id && l.date>=wk.start && l.date<=wk.end && l.value>0);
     if (!plans.length && !logs.length) continue;
     const sums = {}; logs.forEach(l=>sums[l.exId]=(sums[l.exId]||0)+l.value);
-    const goalPct = plans.length ? plans.reduce((a,p)=>a+Math.min(1,(sums[p.exId]||0)/p.goal),0)/plans.length*100 : 0;
+    const wkNorm = g => g*7/dim(wk.start);   // недельная норма = месячная цель ÷ дней в месяце × 7
+    const goalPct = plans.length ? plans.reduce((a,p)=>a+Math.min(1,(sums[p.exId]||0)/wkNorm(p.goal)),0)/plans.length*100 : 0;
     const dayset = new Set(logs.map(l=>l.date));
     rows.push({ user:u, goalPct:Math.round(goalPct), days:dayset.size, dayset, sums,
       score:Math.round(SCORE_GOAL*goalPct + SCORE_DAYS*dayset.size/7*100), streak:streak(u.id) });
@@ -298,41 +327,43 @@ function renderToday(){
   const wk = week(S.today,0), rows = board(wk);
   const mine = rows.find(r=>r.user.id===S.me.id);
   const place = mine ? rows.filter(r=>r.score>mine.score).length+1 : '–';
-  const pct = mine ? mine.goalPct : 0;
+  const mStart = S.today.slice(0,8)+'01', mName = MONTHS[+S.today.slice(5,7)-1];
+  const plans = myPlans().filter(p=>p.goal>0);
+  const mySum = (exId, from, to) => S.log.filter(l=>l.userId===S.me.id && l.exId===exId && l.date>=from && l.date<=to).reduce((a,l)=>a+l.value,0);
+  const pct = plans.length ? Math.round(plans.reduce((a,p)=>a+Math.min(1, mySum(p.exId,mStart,S.today)/p.goal),0)/plans.length*100) : 0;
   const first = String(S.me.name).split(' ')[0];
   let h = `<div class="hero"><div class="arcs"></div>
     <svg class="mnt" viewBox="0 0 400 34" preserveAspectRatio="none"><path d="M0 34V24L38 10 62 19 104 2 140 20 178 8 222 26 262 6 300 21 342 9 372 18 400 12V34Z" fill="#f4f2ee"/><path d="M104 2 92 9 100 8 104 12 110 7 118 9ZM262 6 252 12 260 11 265 14 270 10ZM38 10 30 14 38 13 44 15Z" fill="#c9ced6"/></svg>
-    <div class="in"><div class="hero-top"><img class="logo" src="${LOGO}" alt=""><div><div class="brand">Noobs Riders</div><div class="tag">Подготовка к сезону</div></div></div>
-    <div class="hero-main">${ring(pct,96,9,'#ec944a','rgba(255,255,255,.14)',`<span class="ring-txt">${pct}%</span><small>цели</small>`)}
-    <div><h1>Привет, ${esc(first)}!</h1><div class="sub">Неделя ${fmtD(wk.start)}–${fmtD(wk.end)} · ${mine?mine.score:0} очк.</div>
-    <div class="pills"><span class="pill">🏆 ${place} место</span><span class="pill">📅 ${mine?mine.days:0}/7</span><span class="pill">🔥 ${streak(S.me.id)}</span></div></div></div></div>
+    <div class="in hero-main">${ring(pct,74,8,'#ec944a','rgba(255,255,255,.14)',`<span class="ring-txt">${pct}%</span>`)}
+    <div style="min-width:0"><div class="hero-top"><img class="logo" src="${LOGO}" alt=""><div><div class="brand">Noobs Riders</div><div class="tag">Привет, ${esc(first)}!</div></div></div>
+    <div class="sub">Цель на ${mName}: ${pct}% · неделя ${mine?mine.score:0} очк.</div>
+    <div class="pills"><span class="pill">🏆 ${place} место</span><span class="pill">📅 ${mine?mine.days:0}/7</span><span class="pill">🔥 ${streak(S.me.id)}</span></div></div></div>
   </div>`;
 
   const myDays = new Set(S.log.filter(l=>l.userId===S.me.id).map(l=>l.date));
   h += '<div class="dates">';
-  for (let i=6;i>=0;i--){ const d = addDays(S.today,-i);
-    h += `<button class="date ${d===ui.date?'on':''} ${myDays.has(d)?'done':''}" data-act="date" data-v="${d}">${i===0?'Сег':WD[dow(d)]}<b>${+d.slice(8)}</b></button>`; }
+  wk.days.forEach((d,i)=>{ const fut = d>S.today;
+    h += `<button class="date ${d===ui.date?'on':''} ${myDays.has(d)?'done':''} ${d===S.today?'today':''}" ${fut?'disabled':''} data-act="date" data-v="${d}">${WD[i]}<b>${+d.slice(8)}</b></button>`; });
   h += '</div>';
 
-  const plans = myPlans();
-  if (!plans.length) return h + `<div class="card empty"><div class="big">🎯</div>Выберите упражнения и поставьте цели на неделю<br><br><button class="btn" data-act="tab" data-v="ex">Выбрать упражнения</button></div>`;
+  if (!myPlans().length) return h + `<div class="card empty"><div class="big">🎯</div>Выберите упражнения и поставьте цели на месяц<br><br><button class="btn" data-act="tab" data-v="ex">Выбрать упражнения</button></div>`;
 
   const dayLbl = ui.date===S.today ? 'сегодня' : fmtD(ui.date);
-  for (const p of plans){
+  for (const p of myPlans()){
     const e = exById(p.exId);
     const entries = S.log.filter(l=>l.userId===S.me.id && l.exId===p.exId && l.date===ui.date);
     const dayTot = entries.reduce((a,l)=>a+l.value,0);
-    const wkTot = S.log.filter(l=>l.userId===S.me.id && l.exId===p.exId && l.date>=wk.start && l.date<=wk.end).reduce((a,l)=>a+l.value,0);
-    const wp = p.goal ? Math.min(100, wkTot/p.goal*100) : 0;
-    const season = S.log.filter(l=>l.userId===S.me.id && l.exId===p.exId && l.date>=CONFIG.SEASON_START).reduce((a,l)=>a+l.value,0);
-    h += `<div class="card">
-      <div class="ex-head"><div class="ico">${esc(e.emoji)}</div>
-        <div class="ex-title"><b>${esc(e.name)}</b><span class="hint">неделя ${num(wkTot)}${p.goal?' / '+num(p.goal):''} ${esc(e.unit)}${wp>=100?' ✅':''}<br>за сезон <strong>${num(season)}</strong></span></div>
-        <div class="ex-today"><b id="t-${esc(p.exId)}">${num(dayTot)}</b><span>${dayLbl}</span></div></div>
-      <div class="bar ${wp>=100?'full':''}"><i style="width:${wp}%"></i></div>
-      <div class="quick">${(QUICK[e.unit]||QUICK['повт']).map(v=>`<button class="q" data-act="add" data-ex="${esc(p.exId)}" data-v="${v}">+${v}</button>`).join('')}</div>
-      <div class="custom"><input type="number" inputmode="decimal" min="0" step="any" placeholder="Своё значение, ${esc(e.unit)}" id="in-${esc(p.exId)}"><button class="btn" data-act="addc" data-ex="${esc(p.exId)}">Добавить</button></div>
-      ${entries.length?`<div class="chips">${entries.map(l=>`<span class="chip">${num(l.value)}<button data-act="del" data-v="${esc(l.id)}">×</button></span>`).join('')}</div>`:''}
+    const mTot = mySum(p.exId, mStart, S.today);
+    const mp = p.goal ? Math.min(100, mTot/p.goal*100) : 0;
+    const open = ui.open===p.exId;
+    const q = (QUICK2[e.unit]||QUICK2['повт']);
+    h += `<div class="card ex">
+      <div class="ex-head"><span class="ico">${esc(e.emoji)}</span>
+        <div class="ex-title"><b>${esc(e.name)}</b><span class="hint">${mName}: ${num(mTot)}${p.goal?' / '+num(p.goal):''} ${esc(e.unit)}${mp>=100?' ✅':''}</span></div>
+        <button class="ex-today" data-act="exp" data-ex="${esc(p.exId)}"><b id="t-${esc(p.exId)}">${num(dayTot)}</b><span>${dayLbl}${entries.length?(open?' ▴':' ▾'):''}</span></button></div>
+      <div class="bar ${mp>=100?'full':''}"><i style="width:${mp}%"></i></div>
+      <div class="qrow">${q.map(v=>`<button class="q" data-act="add" data-ex="${esc(p.exId)}" data-v="${v}">+${v}</button>`).join('')}<input type="number" inputmode="decimal" min="0" step="any" placeholder="своё" id="in-${esc(p.exId)}"><button class="btn ok" data-act="addc" data-ex="${esc(p.exId)}" aria-label="Добавить">✓</button></div>
+      ${open&&entries.length?`<div class="chips">${entries.map(l=>`<span class="chip">${num(l.value)}<button data-act="del" data-v="${esc(l.id)}">×</button></span>`).join('')}</div>`:''}
     </div>`;
   }
   return h;
@@ -366,7 +397,7 @@ function renderBoard(){
     h += '<h2>📊 Команда за неделю</h2><div class="card">' + keys.map(k=>{ const e=exById(k);
       return `<div class="tot"><span style="font-size:20px">${esc(e.emoji)}</span><div style="flex:1"><div class="row"><b style="font-size:14px">${esc(e.name)}</b><span class="sp"></span><b>${num(tot[k])}</b>&nbsp;<span class="hint">${esc(e.unit)}</span></div><div class="bar" style="margin:6px 0 0"><i style="width:${tot[k]/max*100}%"></i></div><span class="hint">${who[k].size} уч.</span></div></div>`; }).join('') + '</div>';
   }
-  h += `<div class="hint" style="text-align:center;margin:8px 16px 0">Очки = 70% × выполнение своих целей + 30% × регулярность (дни из 7)</div>`;
+  h += `<div class="hint" style="text-align:center;margin:8px 16px 0">Очки = 70% × выполнение недельной нормы (месячная цель ÷ дней в месяце × 7) + 30% × регулярность (дни из 7)</div>`;
   return h;
 }
 
@@ -380,9 +411,9 @@ function renderProgress(){
   const vals = Object.values(byDay);
   const total = vals.reduce((a,b)=>a+b,0), best = vals.length?Math.max(...vals):0, avg = vals.length?total/vals.length:0;
 
-  let h = `<h2>🎯 Выполнение целей по неделям</h2><div class="card"><div class="chart-box"><canvas id="c1"></canvas></div></div>
+  let h = `<h2>🎯 Выполнение недельной нормы</h2><div class="card"><div class="chart-box"><canvas id="c1"></canvas></div></div>
   <h2>📊 По упражнению</h2><div class="exsel">${plans.map(p=>{const x=exById(p.exId);return `<button class="${p.exId===ui.ex?'on':''}" data-act="pex" data-v="${esc(p.exId)}">${esc(x.emoji)} ${esc(x.name)}</button>`;}).join('')}</div>
-  <div class="card"><div class="hint" style="margin-bottom:6px">Последние 28 дней · пунктир — дневная норма от цели</div><div class="chart-box"><canvas id="c2"></canvas></div>
+  <div class="card"><div class="hint" style="margin-bottom:6px">Последние 28 дней · пунктир — дневная норма от месячной цели</div><div class="chart-box"><canvas id="c2"></canvas></div>
     <div class="stats"><div class="stat"><b>${num(total)}</b><span>за сезон, ${esc(e.unit)}</span></div><div class="stat"><b>${num(best)}</b><span>лучший день</span></div><div class="stat"><b>${num(avg)}</b><span>в среднем</span></div></div></div>
   <h2>🔥 Активность за 16 недель</h2><div class="card"><div class="heat-wrap"><div class="heat-wd">${WD.map((w,i)=>`<span>${i%2===0?w:''}</span>`).join('')}</div><div class="heat" style="flex:1">`;
   const start = week(S.today,-15).start, n = plans.length;
@@ -410,7 +441,7 @@ function drawCharts(){
 
   const p = myPlans().find(p=>p.exId===ui.ex), days = [...Array(28)].map((_,i)=>addDays(S.today,i-27));
   const byDay = {}; S.log.filter(l=>l.userId===S.me.id && l.exId===ui.ex).forEach(l=>byDay[l.date]=(byDay[l.date]||0)+l.value);
-  const data = days.map(d=>byDay[d]||0), norm = p && p.goal ? Math.round(p.goal/7*10)/10 : null;
+  const data = days.map(d=>byDay[d]||0), norm = p && p.goal ? Math.round(p.goal/dim(S.today)*10)/10 : null;
   const ds = [{type:'bar',data,borderRadius:6,backgroundColor:c=>norm&&c.raw>=norm?'#2f9a68':'#dd6a2b'}];
   if (norm) ds.push({type:'line',data:days.map(()=>norm),borderColor:hint,borderDash:[6,4],borderWidth:1.5,pointRadius:0});
   charts.push(new Chart($('#c2'),{data:{labels:days.map(fmtD),datasets:ds},
@@ -422,7 +453,7 @@ function renderEx(){
   let h = '<h2>✅ Мои упражнения</h2><div class="card">';
   if (!mine.length) h += '<div class="hint" style="padding:6px 0">Пока ничего не выбрано. Добавьте из списка ниже</div>';
   mine.forEach(p=>{ const e = exById(p.exId);
-    h += `<div class="erow"><div class="ico">${esc(e.emoji)}</div><div class="sp" style="min-width:0"><b>${esc(e.name)}</b><div class="hint">${esc(e.unit)} / нед</div></div>
+    h += `<div class="erow"><div class="ico">${esc(e.emoji)}</div><div class="sp" style="min-width:0"><b>${esc(e.name)}</b><div class="hint">${esc(e.unit)} / мес</div></div>
       <div class="stepper"><button data-act="gstep" data-ex="${esc(p.exId)}" data-v="-1">−</button><input type="number" inputmode="numeric" value="${p.goal}" data-goal="${esc(p.exId)}"><button data-act="gstep" data-ex="${esc(p.exId)}" data-v="1">+</button></div>
       <button class="sw on" data-act="toggle" data-ex="${esc(p.exId)}" aria-label="Выключить"></button></div>`; });
   h += '</div><h2>📚 Каталог</h2><div class="card">';
@@ -433,7 +464,7 @@ function renderEx(){
   h += `</div><h2>✨ Своё упражнение</h2><div class="card">
     <input id="nx-name" maxlength="40" placeholder="Название, например «Скакалка»">
     <div class="emojis">${EMOJIS.map(x=>`<button class="${x===ui.newEmoji?'on':''}" data-act="emoji" data-v="${x}">${x}</button>`).join('')}</div>
-    <div class="form-grid"><select id="nx-unit">${UNITS.map(u=>`<option>${u}</option>`).join('')}</select><input id="nx-goal" type="number" inputmode="numeric" placeholder="Цель на неделю"></div>
+    <div class="form-grid"><select id="nx-unit">${UNITS.map(u=>`<option>${u}</option>`).join('')}</select><input id="nx-goal" type="number" inputmode="numeric" placeholder="Цель на месяц"></div>
     <button class="btn wide" style="margin-top:10px" data-act="create">Создать и добавить себе</button>
     <div class="hint" style="margin-top:8px">Упражнение появится в каталоге у всех участников</div></div>`;
   return h;
@@ -459,6 +490,7 @@ document.addEventListener('click', e=>{
   const a = b.dataset.act, v = b.dataset.v, ex = b.dataset.ex;
   if (a==='tab'){ ui.tab=v; ui.weekOff=0; render(); scrollTo(0,0); }
   else if (a==='date'){ ui.date=v; render(); }
+  else if (a==='exp'){ ui.open = ui.open===ex ? null : ex; render(); }
   else if (a==='add') addLog(ex, +v);
   else if (a==='addc'){ const inp = document.getElementById('in-'+ex); addLog(ex, parseFloat(String(inp.value).replace(',','.'))); }
   else if (a==='del') call('deleteEntry',{entryId:v}, ()=>{ S.log = S.log.filter(l=>l.id!==v); });
@@ -469,7 +501,7 @@ document.addEventListener('click', e=>{
   else if (a==='activate'){ const x = exById(ex); const old = S.plans.find(p=>p.userId===S.me.id && p.exId===ex); savePlan(ex, old&&old.goal?old.goal:(DEF_GOAL[x.unit]||100), true); haptic('ok'); }
   else if (a==='gstep'){
     const inp = document.querySelector(`[data-goal="${CSS.escape(ex)}"]`); const unit = exById(ex).unit;
-    const step = unit==='км'?1:unit==='мин'?10:unit==='сек'?60:unit==='м'?500:10;
+    const step = unit==='км'?5:unit==='мин'?30:unit==='сек'?300:unit==='м'?1000:50;
     inp.value = Math.max(0, (+inp.value||0) + step*(+v)); haptic();
     clearTimeout(goalTimers[ex]); goalTimers[ex] = setTimeout(()=>savePlan(ex, +inp.value, true), 700);
   }
@@ -496,10 +528,10 @@ function demoData(){
   const ex = EX_DEFAULTS.map(([id,name,unit,emoji])=>({id,name,unit,emoji,createdBy:''}));
   ex.push({id:'c1',name:'Скакалка',unit:'мин',emoji:'🪢',createdBy:'3'});
   const users = [{id:'1',name:'Антон'},{id:'2',name:'Илья'},{id:'3',name:'Маша'},{id:'4',name:'Дима'}];
-  const plans = [['1','pushups',210],['1','pullups',105],['1','wsquats',175],['1','biceps',280],
-    ['2','pullups',150],['2','pushups',250],['2','wallsit',1200],['2','abs',250],['2','squats',200],
-    ['3','plank',900],['3','balance',600],['3','climber',200],['3','superman',200],['3','c1',60],
-    ['4','pushups',200],['4','revpush',200],['4','sltilt',200],['4','squats',150]]
+  const plans = [['1','pushups',900],['1','pullups',450],['1','wsquats',750],['1','biceps',1200],
+    ['2','pullups',650],['2','pushups',1000],['2','wallsit',5000],['2','abs',1000],['2','squats',850],
+    ['3','plank',3800],['3','balance',2500],['3','climber',850],['3','superman',850],['3','c1',250],
+    ['4','pushups',850],['4','revpush',850],['4','sltilt',850],['4','squats',650]]
     .map(([userId,exId,goal])=>({userId,exId,goal,active:true}));
   const log = []; const R = rng(42); let k = 0;
   const push = (date,userId,exId,value)=>{ if (value>0 && date<=today) log.push({id:'d'+(k++),date,userId,exId,value}); };
@@ -512,7 +544,7 @@ function demoData(){
     for (const u of users){
       if (u.id==='1' && d>='2026-10-01' && d<='2026-10-23'){ const j = +d.slice(8)-1; Object.keys(real).forEach(x=>push(d,'1',x,real[x][j])); continue; }
       if (R()>p[u.id]) continue;
-      plans.filter(q=>q.userId===u.id).forEach(q=>{ if (R()<.85){ let v = q.goal/7*(0.5+R()); v = q.goal>=100 ? Math.round(v/5)*5 : Math.round(v*10)/10; push(d,u.id,q.exId,v); } });
+      plans.filter(q=>q.userId===u.id).forEach(q=>{ if (R()<.85){ let v = q.goal/30*(0.5+R()); v = q.goal>=100 ? Math.round(v/5)*5 : Math.round(v*10)/10; push(d,u.id,q.exId,v); } });
     }
   }
   return {today, me:users[0], users, exercises:ex, plans, log};
