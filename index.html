@@ -5,9 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>NOOBS RIDERS</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;900&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;900&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
 /* Фирменный стиль NOOBS RIDERS: графит, оранжевое солнце, бронза, снег */
 :root{
@@ -183,6 +182,8 @@ nav button.on{color:var(--acc)}
 @keyframes pop{50%{transform:scale(1.15)}}
 
 /* компактная главная */
+body.syncing .topbar .brand::after,body.syncing .hero-top .brand::after{content:' ●';color:#ec944a;animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.2}}
 .erow .sp b{display:block;font-size:14px;line-height:1.2;overflow-wrap:anywhere}
 .hero{padding:12px 14px 30px;border-radius:20px}
 .hero .hero-main{gap:12px}
@@ -261,7 +262,7 @@ const AV = [['#d55a26','#ec944a'],['#3d4452','#22262e'],['#9a7445','#d9b580'],['
 const avatar = u => { let k = 0; for (const c of String(u.id)) k = (k*7 + c.charCodeAt(0)) % 9973; const [a,b] = AV[k % AV.length];
   return `<div class="av" style="background:linear-gradient(135deg,${b},${a})">${esc(initials(u.name))}</div>`; };
 const haptic = t => { try { tg && tg.HapticFeedback && (t==='ok' ? tg.HapticFeedback.notificationOccurred('success') : tg.HapticFeedback.impactOccurred('light')); } catch(e){} };
-function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2200); }
+function toast(msg, ms){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'), ms || (/^(Не |Нет |Цель не)/.test(msg) ? 4500 : 2200)); }
 
 function ring(pct,size,stroke,color,track,inner){
   const r=(size-stroke)/2, c=2*Math.PI*r, off=c*(1-Math.min(100,pct)/100);
@@ -297,19 +298,63 @@ function board(wk){
 }
 
 /* ====== API ====== */
+const FATAL = ['bad_value','bad_date','unknown_exercise','forbidden','bad_name','bad_auth','auth_expired','no_auth','no_bot_token','unknown_action'];
+const sleep = ms => new Promise(r=>setTimeout(r, ms));
+const ERR_RU = { bad_value:'неверное число', bad_date:'неверная дата', bad_name:'название от 2 до 40 символов', forbidden:'нельзя удалить чужую запись',
+  bad_auth:'откройте трекер через Telegram', auth_expired:'перезапустите трекер', network:'нет связи с сервером' };
+const errText = e => ERR_RU[e && e.message] || 'сервер не ответил';
+
 async function api(action, body={}){
   if (DEMO) return demoApi(action, body);
-  const r = await fetch(CONFIG.API_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
-    body: JSON.stringify(Object.assign({action, initData: tg.initData}, body)) });
-  const j = await r.json();
+  let r;
+  try {
+    r = await fetch(CONFIG.API_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify(Object.assign({action, initData: tg.initData}, body)) });
+  } catch(e){ throw new Error('network'); }
+  let j; try { j = await r.json(); } catch(e){ throw new Error('bad_response'); }
   if (!j.ok) throw new Error(j.error);
   return j.data;
 }
-async function call(action, body, optimistic){
-  if (optimistic) { optimistic(); render(); }
-  try { S = await api(action, body); render(); }
-  catch(e){ toast('Ошибка: '+e.message); try { S = await api('bootstrap'); render(); } catch(_){} }
+async function apiRetry(action, body, tries=4){
+  for (let i=0;;i++){
+    try { return await api(action, typeof body==='function' ? body() : body); }
+    catch(e){ if (i>=tries-1 || FATAL.includes(e.message)) throw e; await sleep(700*(i+1)); }
+  }
 }
+
+/* Изменения отправляются строго по очереди, интерфейс обновляется сразу (оптимистично). */
+let queue = Promise.resolve(), pending = 0, syncTimer = null;
+const idMap = {};
+function send(action, body){
+  pending++; setSync();
+  const p = queue.then(()=>apiRetry(action, body));
+  queue = p.catch(()=>{});
+  p.catch(()=>{}).finally(()=>{ pending--; setSync(); scheduleSync(2500); });
+  return p;
+}
+function scheduleSync(ms){
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(async ()=>{
+    if (pending) return;
+    try { const s = await apiRetry('bootstrap', {}, 2); if (!pending){ S = s; saveCache(); safeRender(); } } catch(e){}
+  }, ms);
+}
+function safeRender(){
+  const a = document.activeElement;
+  if (a && a.tagName==='INPUT' && a.value) { setTimeout(safeRender, 1500); return; }
+  render();
+}
+function setSync(){ document.body.classList.toggle('syncing', pending>0); }
+
+const CACHE_KEY = 'nr_cache_v2';
+function cacheUser(){ try { return String(tg.initDataUnsafe.user.id); } catch(e){ return ''; } }
+function saveCache(){ if (DEMO) return; try { localStorage.setItem(CACHE_KEY, JSON.stringify({u:cacheUser(), s:S})); } catch(e){} }
+function loadCache(){
+  if (DEMO) return null;
+  try { const c = JSON.parse(localStorage.getItem(CACHE_KEY)); if (c && c.s && c.u && c.u===cacheUser()) return c.s; } catch(e){}
+  return null;
+}
+const mskToday = () => new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Moscow'});
 
 /* ====== рендер ====== */
 function render(){
@@ -426,8 +471,15 @@ function renderProgress(){
   return h;
 }
 
+let chartLoading = null;
+function loadChart(){
+  if (window.Chart) return Promise.resolve();
+  if (!chartLoading) chartLoading = new Promise((res, rej)=>{ const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js'; s.onload = res; s.onerror = ()=>{ chartLoading = null; rej(); }; document.head.appendChild(s); });
+  return chartLoading;
+}
 function drawCharts(){
-  if (!window.Chart) return;
+  if (!window.Chart){ loadChart().then(()=>{ if (ui.tab==='progress') render(); }).catch(()=>{}); return; }
   const hint = getComputedStyle(document.body).getPropertyValue('--hint').trim() || '#8a93a6';
   Chart.defaults.color = hint; Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
   const grid = 'rgba(128,128,128,.15)';
@@ -473,16 +525,27 @@ function renderEx(){
 /* ====== события ====== */
 let goalTimers = {};
 function savePlan(exId, goal, active){
-  call('setPlan',{exId, goal, active}, ()=>{
-    const p = S.plans.find(p=>p.userId===S.me.id && p.exId===exId);
-    if (p){ p.goal=goal; p.active=active; } else S.plans.push({userId:S.me.id, exId, goal, active});
-  });
+  const p = S.plans.find(p=>p.userId===S.me.id && p.exId===exId);
+  if (p){ p.goal=goal; p.active=active; } else S.plans.push({userId:S.me.id, exId, goal, active});
+  render(); saveCache();
+  send('setPlan',{exId, goal, active}).catch(e=>toast('Цель не сохранилась: '+errText(e)));
 }
 function addLog(exId, value){
   if (!(value>0)) return toast('Введите число больше нуля');
   haptic();
-  call('log',{date:ui.date, exId, value}, ()=>S.log.push({id:'tmp'+Date.now(), date:ui.date, userId:S.me.id, exId, value}))
-    .then(()=>{ const el = document.getElementById('t-'+exId); if (el) el.classList.add('pop'); });
+  const tmp = 'tmp'+Date.now()+Math.random().toString(36).slice(2,6);
+  S.log.push({id:tmp, date:ui.date, userId:S.me.id, exId, value});
+  render(); saveCache();
+  const el = document.getElementById('t-'+exId); if (el) el.classList.add('pop');
+  send('log',{date:ui.date, exId, value})
+    .then(r=>{ idMap[tmp] = r.id; const l = S.log.find(l=>l.id===tmp); if (l) l.id = r.id; saveCache(); })
+    .catch(e=>{ S.log = S.log.filter(l=>l.id!==tmp); render(); saveCache(); toast('Не сохранилось: '+errText(e)); });
+}
+function delLog(id){
+  const old = S.log.find(l=>l.id===id); if (!old) return;
+  S.log = S.log.filter(l=>l.id!==id); render(); saveCache();
+  send('deleteEntry', ()=>({entryId: idMap[id] || id}))
+    .catch(e=>{ S.log.push(old); render(); saveCache(); toast('Не удалилось: '+errText(e)); });
 }
 
 document.addEventListener('click', e=>{
@@ -493,7 +556,7 @@ document.addEventListener('click', e=>{
   else if (a==='exp'){ ui.open = ui.open===ex ? null : ex; render(); }
   else if (a==='add') addLog(ex, +v);
   else if (a==='addc'){ const inp = document.getElementById('in-'+ex); addLog(ex, parseFloat(String(inp.value).replace(',','.'))); }
-  else if (a==='del') call('deleteEntry',{entryId:v}, ()=>{ S.log = S.log.filter(l=>l.id!==v); });
+  else if (a==='del') delLog(v);
   else if (a==='wk'){ ui.weekOff = Math.min(0, ui.weekOff + +v); render(); }
   else if (a==='sort'){ ui.sort=v; render(); }
   else if (a==='pex'){ ui.ex=v; render(); }
@@ -509,7 +572,13 @@ document.addEventListener('click', e=>{
   else if (a==='create'){
     const name = $('#nx-name').value.trim(), unit = $('#nx-unit').value, goal = +$('#nx-goal').value || DEF_GOAL[unit];
     if (name.length<2) return toast('Введите название');
-    haptic('ok'); call('addExercise',{name, unit, emoji:ui.newEmoji, goal}).then(()=>toast('Добавлено: '+name));
+    haptic('ok'); b.disabled = true; toast('Добавляю…');
+    send('addExercise',{name, unit, emoji:ui.newEmoji, goal}).then(r=>{
+      if (!S.exercises.find(x=>x.id===r.exercise.id)) S.exercises.push(r.exercise);
+      const p = S.plans.find(p=>p.userId===S.me.id && p.exId===r.exercise.id);
+      if (p){ p.goal=r.goal; p.active=true; } else S.plans.push({userId:S.me.id, exId:r.exercise.id, goal:r.goal, active:true});
+      saveCache(); render(); toast('Добавлено: '+name);
+    }).catch(e=>{ b.disabled = false; toast('Не добавилось: '+errText(e)); });
   }
 });
 document.addEventListener('change', e=>{
@@ -552,13 +621,16 @@ function demoData(){
 function demoApi(action, b){
   if (!DB) DB = demoData();
   const me = DB.me.id;
-  if (action==='log') DB.log.push({id:'d'+Date.now(), date:b.date, userId:me, exId:b.exId, value:+b.value});
+  const out = x => new Promise(r=>setTimeout(()=>r(JSON.parse(JSON.stringify(x))), 120));
+  if (action==='log'){ const id = 'd'+Date.now(); DB.log.push({id, date:b.date, userId:me, exId:b.exId, value:+b.value}); return out({id}); }
   if (action==='deleteEntry') DB.log = DB.log.filter(l=>l.id!==b.entryId);
   if (action==='setPlan'){ const p = DB.plans.find(p=>p.userId===me && p.exId===b.exId); if (p){ p.goal=b.goal; p.active=b.active; } else DB.plans.push({userId:me, exId:b.exId, goal:b.goal, active:b.active}); }
   if (action==='addExercise'){ let e = DB.exercises.find(e=>e.name.toLowerCase()===b.name.toLowerCase());
     if (!e){ e = {id:'c'+Date.now().toString(36), name:b.name, unit:b.unit, emoji:b.emoji, createdBy:me}; DB.exercises.push(e); }
-    demoApi('setPlan',{exId:e.id, goal:b.goal, active:true}); }
-  return new Promise(r=>setTimeout(()=>r(JSON.parse(JSON.stringify(DB))), 120));
+    const p = DB.plans.find(p=>p.userId===me && p.exId===e.id); if (p){ p.goal=b.goal; p.active=true; } else DB.plans.push({userId:me, exId:e.id, goal:b.goal, active:true});
+    return out({exercise:e, goal:b.goal}); }
+  if (action!=='bootstrap') return out({ok:true});
+  return out(DB);
 }
 
 /* ====== старт ====== */
@@ -568,8 +640,10 @@ function demoApi(action, b){
   const fav = document.createElement('link'); fav.rel='icon'; fav.href=LOGO; document.head.appendChild(fav);
   if (tg){ try { tg.ready(); tg.expand(); const c = dark?'#121419':'#efece6'; tg.setHeaderColor && tg.setHeaderColor(c); tg.setBackgroundColor && tg.setBackgroundColor(c); } catch(e){} }
   if (!DEMO && CONFIG.API_URL.indexOf('PASTE_')===0){ $('#app').innerHTML = '<div class="card empty"><div class="big">⚙️</div>Не указан API_URL в index.html</div>'; return; }
-  try { S = await api('bootstrap'); ui.date = S.today; render(); }
-  catch(e){ $('#app').innerHTML = `<div class="card empty"><div class="big">⚠️</div>Не удалось загрузить данные<br><span class="hint">${esc(e.message)}</span><br><br><button class="btn" onclick="location.reload()">Повторить</button></div>`; }
+  const cached = loadCache();
+  if (cached){ S = cached; S.today = mskToday(); S.me = cached.me; ui.date = S.today; render(); }
+  try { const s = await apiRetry('bootstrap', {}, 3); if (!pending){ S = s; ui.date = ui.date || S.today; saveCache(); safeRender(); } }
+  catch(e){ if (cached) { toast('Нет связи — показаны сохранённые данные'); return; } $('#app').innerHTML = `<div class="card empty"><div class="big">⚠️</div>Не удалось загрузить данные<br><span class="hint">${esc(e.message)}</span><br><br><button class="btn" onclick="location.reload()">Повторить</button></div>`; }
 })();
 </script>
 </body>
