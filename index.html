@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>NOOBS RIDERS</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;900&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Фирменный стиль NOOBS RIDERS: графит, оранжевое солнце, бронза, снег */
+:root{
+  --page:#efece6; --card:#ffffff; --text:#22262e; --hint:#7c818b;
+  --line:rgba(34,38,46,.10); --soft:rgba(34,38,46,.06);
+  --ink:#22262e; --acc:#d55a26; --acc2:#b8925f; --ok:#2f9a68; --snow:#f4f2ee;
+  --grad:linear-gradient(135deg,#bf4c1c 0%,#dd6a2b 60%,#ec944a 100%);
+  --bronze:linear-gradient(135deg,#8c6a3f 0%,#d9b580 50%,#9a7445 100%);
+  --hfont:"Unbounded","Arial Black",sans-serif;
+}
+:root[data-theme=dark]{
+  --page:#121419; --card:#1d2027; --text:#eef0f3; --hint:#8d929c;
+  --line:rgba(255,255,255,.08); --soft:rgba(255,255,255,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{background:var(--page);color:var(--text);font:15px/1.4 Manrope,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+h1,h2,.brand,.ex-today b,.lscore b,.pod .sc,.stat b,.rank{font-family:var(--hfont);letter-spacing:-.01em}
+.brand{font-weight:900;letter-spacing:.04em;text-transform:uppercase}
+.logo{width:42px;height:42px;border-radius:50%;object-fit:cover;box-shadow:0 0 0 2px #b8925f;flex:none;background:#f4f2ee}
+.topbar{display:flex;align-items:center;gap:10px;margin:2px 2px 14px}
+.topbar .logo{width:34px;height:34px}
+.topbar .brand{font-size:14px}
+body{padding:12px 12px calc(88px + env(safe-area-inset-bottom));max-width:560px;margin:0 auto}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+input,select{font:inherit;color:var(--text);background:var(--soft);border:1px solid transparent;border-radius:12px;padding:10px 12px;outline:none;width:100%}
+input:focus,select:focus{border-color:var(--acc)}
+.hint{color:var(--hint);font-size:13px}
+.card{background:var(--card);border-radius:20px;padding:16px;margin-bottom:12px}
+h2{font-size:17px;margin:18px 4px 10px}
+.row{display:flex;align-items:center;gap:10px}
+.sp{flex:1}
+.banner{background:var(--soft);border-radius:12px;padding:8px 12px;font-size:13px;color:var(--hint);margin-bottom:12px;text-align:center}
+
+/* hero */
+.hero{position:relative;overflow:hidden;background:var(--ink);color:#fff;border-radius:24px;padding:16px 18px 40px;margin-bottom:12px;box-shadow:0 12px 30px rgba(34,38,46,.28)}
+.hero::before{content:"";position:absolute;right:-38px;top:-62px;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 35% 65%,#ec944a,#c9531f 70%);opacity:.95}
+.hero .arcs{position:absolute;right:-62px;top:-86px;width:196px;height:196px;border-radius:50%;border:3px solid transparent;border-left-color:#b8925f;border-bottom-color:#b8925f;transform:rotate(15deg);opacity:.8}
+.hero .mnt{position:absolute;left:0;right:0;bottom:-1px;width:100%;height:34px}
+.hero > .in{position:relative;z-index:1}
+.hero-top{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.hero-top .brand{font-size:15px;line-height:1.1}
+.hero-top .tag{font-size:11px;color:#e6d3b5;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+.hero-main{display:flex;gap:16px;align-items:center}
+.hero h1,.hero .sub{text-shadow:0 1px 6px rgba(0,0,0,.35)}
+.hero .ring-txt{font-weight:900;font-size:20px;font-family:var(--hfont)}
+.hero h1{font-size:17px;line-height:1.2}
+.hero .sub{color:#c9ccd3;font-size:13px;margin:4px 0 10px}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pill{background:rgba(255,255,255,.08);border:1px solid rgba(184,146,95,.6);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+.ring{position:relative;flex:none}
+.ring .ring-txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;line-height:1}
+.ring .ring-txt small{font-size:10px;font-weight:600;opacity:.85;margin-top:3px}
+
+/* dates */
+.dates{display:flex;gap:6px;overflow-x:auto;margin:0 -12px 12px;padding:0 12px;scrollbar-width:none}
+.dates::-webkit-scrollbar{display:none}
+.date{flex:1 0 44px;background:var(--card);border-radius:14px;padding:8px 0;text-align:center;font-size:12px;color:var(--hint);position:relative}
+.date b{display:block;font-size:16px;color:var(--text)}
+.date.on{background:var(--ink);color:#fff;box-shadow:inset 0 -3px 0 var(--acc)}.date.on b{color:#fff}
+.date.done::after{content:"";position:absolute;bottom:5px;left:50%;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--ok)}
+.date.on.done::after{background:#fff}
+
+/* exercise card */
+.ex-head{display:flex;align-items:center;gap:12px}
+.ico{width:44px;height:44px;border-radius:14px;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:22px;flex:none}
+.ex-title{flex:1;min-width:0}
+.ex-title b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ex-today{text-align:right;line-height:1.1}
+.ex-today b{font-size:26px;font-weight:800}
+.ex-today span{display:block;font-size:11px;color:var(--hint)}
+.bar{height:8px;border-radius:99px;background:var(--soft);overflow:hidden;margin:12px 0}
+.bar i{display:block;height:100%;border-radius:99px;background:var(--grad);transition:width .5s}
+.bar.full i{background:var(--ok)}
+.quick{display:flex;gap:6px;flex-wrap:wrap}
+.q{flex:1;min-width:52px;background:var(--soft);border-radius:12px;padding:9px 0;font-weight:700}
+.q:active{transform:scale(.95);background:var(--acc);color:#fff}
+.custom{display:flex;gap:6px;margin-top:8px}
+.custom input{flex:1}
+.btn{background:var(--acc);color:#fff;border-radius:12px;padding:10px 16px;font-weight:700;white-space:nowrap}
+.btn.ghost{background:var(--soft);color:var(--text)}
+.btn.wide{width:100%;padding:13px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.chip{background:var(--soft);border-radius:999px;padding:4px 6px 4px 12px;font-size:13px;display:flex;align-items:center;gap:4px}
+.chip button{width:22px;height:22px;border-radius:50%;color:var(--hint);font-size:15px;line-height:1}
+
+/* board */
+.seg{display:flex;background:var(--card);border-radius:14px;padding:4px;gap:4px;margin-bottom:12px}
+.seg button{flex:1;padding:8px 0;border-radius:10px;font-size:13px;font-weight:600;color:var(--hint)}
+.seg button.on{background:var(--ink);color:#fff}
+:root[data-theme=dark] .seg button.on,:root[data-theme=dark] .date.on{background:#343946}
+.wk{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.wk button{width:38px;height:38px;border-radius:12px;background:var(--card);font-size:18px}
+.wk button:disabled{opacity:.3}
+.podium{display:flex;align-items:flex-end;justify-content:center;gap:10px;padding:8px 0 4px}
+.pod{flex:1;text-align:center;max-width:120px}
+.pod .av{margin:0 auto 6px}
+.pod .nm{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pod .sc{font-size:20px;font-weight:800}
+.pod .base{border-radius:14px 14px 4px 4px;margin-top:8px;display:flex;align-items:flex-start;justify-content:center;padding-top:8px;font-size:22px}
+.p1 .base{height:86px;background:var(--grad)}
+.p2 .base{height:62px;background:linear-gradient(135deg,#8e96a3,#d3d8e0)}
+.p3 .base{height:46px;background:var(--bronze)}
+.av{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:15px;flex:none}
+.p1 .av{width:58px;height:58px;font-size:19px;box-shadow:0 0 0 3px var(--acc2)}
+.podium-card{background:var(--ink);color:#fff;position:relative;overflow:hidden}
+.podium-card .nm{color:#fff}.podium-card::before{content:"";position:absolute;left:50%;top:-80px;width:200px;height:200px;margin-left:-100px;border-radius:50%;background:radial-gradient(circle,#dd6a2b55,transparent 70%)}
+.podium-card .podium{position:relative}
+.lrow{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.lrow:first-child{border-top:0}
+.lrow.me{background:rgba(213,90,38,.08);margin:0 -16px;padding:10px 16px}
+.rank{width:22px;text-align:center;font-weight:800;color:var(--hint)}
+.lmid{flex:1;min-width:0}
+.lmid b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dots{display:flex;gap:3px;margin-top:4px}
+.dots i{width:14px;height:5px;border-radius:3px;background:var(--soft)}
+.dots i.on{background:var(--ok)}
+.lscore{text-align:right}
+.lscore b{font-size:22px;font-weight:800}
+.lscore span{display:block;font-size:11px;color:var(--hint)}
+.tot{display:flex;align-items:center;gap:10px;padding:8px 0}
+.tot .bar{flex:1;margin:0}
+
+/* progress */
+.chart-box{position:relative;height:190px}
+.exsel{display:flex;gap:6px;overflow-x:auto;margin-bottom:10px;scrollbar-width:none}
+.exsel::-webkit-scrollbar{display:none}
+.exsel button{background:var(--soft);border-radius:999px;padding:6px 12px;font-size:13px;white-space:nowrap}
+.exsel button.on{background:var(--ink);color:#fff}
+:root[data-theme=dark] .exsel button.on{background:var(--acc)}
+.heat{display:grid;grid-template-rows:repeat(7,1fr);grid-auto-flow:column;gap:3px}
+.heat i{aspect-ratio:1;border-radius:3px;background:var(--soft)}
+.heat i.l1{background:rgba(213,90,38,.25)}.heat i.l2{background:rgba(213,90,38,.5)}.heat i.l3{background:rgba(213,90,38,.78)}.heat i.l4{background:#c9531f}
+.heat i.fut{background:transparent}
+.heat-wrap{display:flex;gap:6px}
+.heat-wd{display:grid;grid-template-rows:repeat(7,1fr);gap:3px;font-size:9px;color:var(--hint)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.stat{background:var(--soft);border-radius:14px;padding:10px;text-align:center}
+.stat b{display:block;font-size:18px;font-weight:800}
+.stat span{font-size:11px;color:var(--hint)}
+
+/* exercises */
+.erow{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.erow:first-child{border-top:0}
+.stepper{display:flex;align-items:center;gap:4px}
+.stepper button{width:32px;height:32px;border-radius:10px;background:var(--soft);font-size:18px;font-weight:700}
+.stepper input{width:64px;text-align:center;padding:6px 4px}
+.sw{width:46px;height:28px;border-radius:99px;background:var(--soft);position:relative;flex:none;transition:.2s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.sw.on{background:var(--ok)}.sw.on::after{left:21px}
+.add{background:var(--soft);border-radius:10px;padding:7px 12px;font-weight:700;font-size:13px;color:var(--acc)}
+.emojis{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin:10px 0}
+.emojis button{aspect-ratio:1;border-radius:10px;background:var(--soft);font-size:20px}
+.emojis button.on{background:var(--acc)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.badge{font-size:11px;background:var(--soft);border-radius:6px;padding:1px 6px;color:var(--hint);margin-left:4px;font-weight:500}
+.empty{text-align:center;padding:24px 8px;color:var(--hint)}
+.empty .big{font-size:40px;margin-bottom:6px}
+
+/* nav */
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px 8px calc(6px + env(safe-area-inset-bottom));z-index:5}
+nav .in{display:flex;width:100%;max-width:560px}
+nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--hint);padding:4px 0;font-weight:600}
+nav button svg{width:24px;height:24px}
+nav button.on{color:var(--acc)}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(20px);background:var(--ink);border:1px solid #b8925f;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:9;max-width:90%}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.loading{text-align:center;padding:80px 0;color:var(--hint)}
+.spin{width:34px;height:34px;border:3px solid var(--soft);border-top-color:var(--acc);border-radius:50%;margin:0 auto 12px;animation:sp 0.8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.pop{animation:pop .35s}
+@keyframes pop{50%{transform:scale(1.15)}}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading"><div class="spin"></div><div class="brand" style="font-family:var(--hfont)">NOOBS RIDERS</div>Загрузка…</div></div>
+<nav><div class="in">
+  <button data-act="tab" data-v="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Сегодня</button>
+  <button data-act="tab" data-v="board"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>Рейтинг</button>
+  <button data-act="tab" data-v="progress"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V11M11 20V5M17 20v-6M2 20h20"/></svg>Прогресс</button>
+  <button data-act="tab" data-v="ex"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>Упражнения</button>
+</div></nav>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ====== НАСТРОЙКА: вставьте URL веб-приложения Apps Script ====== */
+const CONFIG = {
+  API_URL: 'PASTE_APPS_SCRIPT_WEBAPP_URL',
+  SEASON_START: '2026-10-01',   // с какой даты считать «сезон» (сумма с начала челленджа)
+};
+
+/* ====== ядро ====== */
+const tg = window.Telegram && window.Telegram.WebApp;
+const DEMO = !(tg && tg.initData);
+const SCORE_GOAL = 0.7, SCORE_DAYS = 0.3;
+const UNITS = ['повт','сек','мин','км','м'];
+const QUICK = {'повт':[5,10,15,20,30],'сек':[30,60,90,120,180],'мин':[5,10,15,30],'км':[1,2,3,5],'м':[100,250,500,1000]};
+const DEF_GOAL = {'повт':200,'сек':900,'мин':150,'км':15,'м':3000};
+const EMOJIS = ['💪','🦵','🦾','🏋️','🧗','🔥','🪑','⏱️','🦩','🙈','⛰️','🦸','🔁','🏃','🏂','⭐'];
+/* Каталог по умолчанию — должен совпадать с DEFAULT_EXERCISES в Code.gs */
+const EX_DEFAULTS = [['pullups','Подтягивания','повт','🧗'],['pushups','Отжимания','повт','💪'],['abs','Пресс','повт','🔥'],['squats','Приседания','повт','🦵'],
+  ['wallsit','Стульчик','сек','🪑'],['plank','Планка','сек','⏱️'],['revpush','Обратные отжимания','повт','🔁'],['sltilt','Наклоны на одной ноге','повт','🦩'],
+  ['balance','Стойка на одной ноге (глаза закрыты)','сек','🙈'],['climber','Скалолаз','повт','⛰️'],['superman','Диагональный супермен','повт','🦸'],
+  ['wsquats','Приседания с весом','повт','🏋️'],['biceps','Бицепс','повт','🦾'],['burpee','Берпи','повт','⚡'],['lunges','Выпады','повт','🚶'],['run','Бег','км','🏃']];
+const LOGO = 'data:image/jpeg;base64,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';
+const WD = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+
+let S = null;
+let ui = { tab:'today', date:null, weekOff:0, sort:'score', ex:null, newEmoji:'⭐' };
+let charts = [];
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const addDays = (d,n) => { const t = new Date(d+'T00:00:00Z'); t.setUTCDate(t.getUTCDate()+n); return t.toISOString().slice(0,10); };
+const dow = d => (new Date(d+'T00:00:00Z').getUTCDay()+6)%7;
+const week = (today,off) => { const s = addDays(today,-dow(today)+7*off); return {start:s,end:addDays(s,6),days:[...Array(7)].map((_,i)=>addDays(s,i))}; };
+const fmtD = d => { const p = d.split('-'); return (+p[2])+'.'+p[1]; };
+const num = n => String(Math.round(n*10)/10).replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+const exById = id => S.exercises.find(e=>e.id===id) || {id, name:'?', emoji:'•', unit:''};
+const myPlans = () => S.plans.filter(p=>p.userId===S.me.id && p.active);
+const initials = n => String(n).split(/\s+/).filter(Boolean).map(w=>w[0]).join('').slice(0,2).toUpperCase();
+const hue = id => { let h = 0; for (const c of String(id)) h = (h*31+c.charCodeAt(0))%360; return h; };
+const AV = [['#d55a26','#ec944a'],['#3d4452','#22262e'],['#9a7445','#d9b580'],['#35597a','#5b82a6'],['#5f6f45','#8aa063'],['#8c3b2a','#c25a3c']];
+const avatar = u => { let k = 0; for (const c of String(u.id)) k = (k*7 + c.charCodeAt(0)) % 9973; const [a,b] = AV[k % AV.length];
+  return `<div class="av" style="background:linear-gradient(135deg,${b},${a})">${esc(initials(u.name))}</div>`; };
+const haptic = t => { try { tg && tg.HapticFeedback && (t==='ok' ? tg.HapticFeedback.notificationOccurred('success') : tg.HapticFeedback.impactOccurred('light')); } catch(e){} };
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2200); }
+
+function ring(pct,size,stroke,color,track,inner){
+  const r=(size-stroke)/2, c=2*Math.PI*r, off=c*(1-Math.min(100,pct)/100);
+  return `<div class="ring" style="width:${size}px;height:${size}px"><svg width="${size}" height="${size}" style="transform:rotate(-90deg)">
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${track}" stroke-width="${stroke}"/>
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}" style="transition:stroke-dashoffset .6s"/>
+  </svg><div class="ring-txt">${inner}</div></div>`;
+}
+
+/* ====== расчёт рейтинга (та же формула, что в Code.gs) ====== */
+function streak(userId){
+  const set = new Set(S.log.filter(l=>l.userId===userId && l.value>0).map(l=>l.date));
+  let d = set.has(S.today) ? S.today : addDays(S.today,-1), n = 0;
+  while (set.has(d)) { n++; d = addDays(d,-1); }
+  return n;
+}
+function board(wk){
+  const rows = [];
+  for (const u of S.users){
+    const plans = S.plans.filter(p=>p.userId===u.id && p.active && p.goal>0);
+    const logs = S.log.filter(l=>l.userId===u.id && l.date>=wk.start && l.date<=wk.end && l.value>0);
+    if (!plans.length && !logs.length) continue;
+    const sums = {}; logs.forEach(l=>sums[l.exId]=(sums[l.exId]||0)+l.value);
+    const goalPct = plans.length ? plans.reduce((a,p)=>a+Math.min(1,(sums[p.exId]||0)/p.goal),0)/plans.length*100 : 0;
+    const dayset = new Set(logs.map(l=>l.date));
+    rows.push({ user:u, goalPct:Math.round(goalPct), days:dayset.size, dayset, sums,
+      score:Math.round(SCORE_GOAL*goalPct + SCORE_DAYS*dayset.size/7*100), streak:streak(u.id) });
+  }
+  const key = {score:'score', goal:'goalPct', days:'days'}[ui.sort] || 'score';
+  rows.sort((a,b)=>b[key]-a[key] || b.score-a.score || b.days-a.days);
+  return rows;
+}
+
+/* ====== API ====== */
+async function api(action, body={}){
+  if (DEMO) return demoApi(action, body);
+  const r = await fetch(CONFIG.API_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify(Object.assign({action, initData: tg.initData}, body)) });
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error);
+  return j.data;
+}
+async function call(action, body, optimistic){
+  if (optimistic) { optimistic(); render(); }
+  try { S = await api(action, body); render(); }
+  catch(e){ toast('Ошибка: '+e.message); try { S = await api('bootstrap'); render(); } catch(_){} }
+}
+
+/* ====== рендер ====== */
+function render(){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.v===ui.tab));
+  charts.forEach(c=>c.destroy()); charts = [];
+  const banner = DEMO ? '<div class="banner">Демо-режим с тестовыми данными. В Telegram подключится общая таблица</div>' : '';
+  const html = {today:renderToday, board:renderBoard, progress:renderProgress, ex:renderEx}[ui.tab]();
+  const title = {board:'Рейтинг', progress:'Прогресс', ex:'Упражнения'}[ui.tab];
+  const top = title ? `<div class="topbar"><img class="logo" src="${LOGO}" alt=""><span class="brand">Noobs Riders</span><span class="sp"></span><span class="hint">${title}</span></div>` : '';
+  $('#app').innerHTML = banner + top + html;
+  if (ui.tab==='progress') drawCharts();
+}
+
+function renderToday(){
+  const wk = week(S.today,0), rows = board(wk);
+  const mine = rows.find(r=>r.user.id===S.me.id);
+  const place = mine ? rows.filter(r=>r.score>mine.score).length+1 : '–';
+  const pct = mine ? mine.goalPct : 0;
+  const first = String(S.me.name).split(' ')[0];
+  let h = `<div class="hero"><div class="arcs"></div>
+    <svg class="mnt" viewBox="0 0 400 34" preserveAspectRatio="none"><path d="M0 34V24L38 10 62 19 104 2 140 20 178 8 222 26 262 6 300 21 342 9 372 18 400 12V34Z" fill="#f4f2ee"/><path d="M104 2 92 9 100 8 104 12 110 7 118 9ZM262 6 252 12 260 11 265 14 270 10ZM38 10 30 14 38 13 44 15Z" fill="#c9ced6"/></svg>
+    <div class="in"><div class="hero-top"><img class="logo" src="${LOGO}" alt=""><div><div class="brand">Noobs Riders</div><div class="tag">Подготовка к сезону</div></div></div>
+    <div class="hero-main">${ring(pct,96,9,'#ec944a','rgba(255,255,255,.14)',`<span class="ring-txt">${pct}%</span><small>цели</small>`)}
+    <div><h1>Привет, ${esc(first)}!</h1><div class="sub">Неделя ${fmtD(wk.start)}–${fmtD(wk.end)} · ${mine?mine.score:0} очк.</div>
+    <div class="pills"><span class="pill">🏆 ${place} место</span><span class="pill">📅 ${mine?mine.days:0}/7</span><span class="pill">🔥 ${streak(S.me.id)}</span></div></div></div></div>
+  </div>`;
+
+  const myDays = new Set(S.log.filter(l=>l.userId===S.me.id).map(l=>l.date));
+  h += '<div class="dates">';
+  for (let i=6;i>=0;i--){ const d = addDays(S.today,-i);
+    h += `<button class="date ${d===ui.date?'on':''} ${myDays.has(d)?'done':''}" data-act="date" data-v="${d}">${i===0?'Сег':WD[dow(d)]}<b>${+d.slice(8)}</b></button>`; }
+  h += '</div>';
+
+  const plans = myPlans();
+  if (!plans.length) return h + `<div class="card empty"><div class="big">🎯</div>Выберите упражнения и поставьте цели на неделю<br><br><button class="btn" data-act="tab" data-v="ex">Выбрать упражнения</button></div>`;
+
+  const dayLbl = ui.date===S.today ? 'сегодня' : fmtD(ui.date);
+  for (const p of plans){
+    const e = exById(p.exId);
+    const entries = S.log.filter(l=>l.userId===S.me.id && l.exId===p.exId && l.date===ui.date);
+    const dayTot = entries.reduce((a,l)=>a+l.value,0);
+    const wkTot = S.log.filter(l=>l.userId===S.me.id && l.exId===p.exId && l.date>=wk.start && l.date<=wk.end).reduce((a,l)=>a+l.value,0);
+    const wp = p.goal ? Math.min(100, wkTot/p.goal*100) : 0;
+    const season = S.log.filter(l=>l.userId===S.me.id && l.exId===p.exId && l.date>=CONFIG.SEASON_START).reduce((a,l)=>a+l.value,0);
+    h += `<div class="card">
+      <div class="ex-head"><div class="ico">${esc(e.emoji)}</div>
+        <div class="ex-title"><b>${esc(e.name)}</b><span class="hint">неделя ${num(wkTot)}${p.goal?' / '+num(p.goal):''} ${esc(e.unit)}${wp>=100?' ✅':''}<br>за сезон <strong>${num(season)}</strong></span></div>
+        <div class="ex-today"><b id="t-${esc(p.exId)}">${num(dayTot)}</b><span>${dayLbl}</span></div></div>
+      <div class="bar ${wp>=100?'full':''}"><i style="width:${wp}%"></i></div>
+      <div class="quick">${(QUICK[e.unit]||QUICK['повт']).map(v=>`<button class="q" data-act="add" data-ex="${esc(p.exId)}" data-v="${v}">+${v}</button>`).join('')}</div>
+      <div class="custom"><input type="number" inputmode="decimal" min="0" step="any" placeholder="Своё значение, ${esc(e.unit)}" id="in-${esc(p.exId)}"><button class="btn" data-act="addc" data-ex="${esc(p.exId)}">Добавить</button></div>
+      ${entries.length?`<div class="chips">${entries.map(l=>`<span class="chip">${num(l.value)}<button data-act="del" data-v="${esc(l.id)}">×</button></span>`).join('')}</div>`:''}
+    </div>`;
+  }
+  return h;
+}
+
+function renderBoard(){
+  const wk = week(S.today, ui.weekOff), rows = board(wk);
+  let h = `<div class="wk"><button data-act="wk" data-v="-1">‹</button><div style="text-align:center"><b>${ui.weekOff===0?'Эта неделя':ui.weekOff===-1?'Прошлая неделя':'Неделя'}</b><div class="hint">${fmtD(wk.start)} – ${fmtD(wk.end)}</div></div><button data-act="wk" data-v="1" ${ui.weekOff>=0?'disabled':''}>›</button></div>
+  <div class="seg">${[['score','Очки'],['goal','% цели'],['days','Дни']].map(([k,t])=>`<button class="${ui.sort===k?'on':''}" data-act="sort" data-v="${k}">${t}</button>`).join('')}</div>`;
+  if (!rows.length) return h + '<div class="card empty"><div class="big">🏁</div>На этой неделе пока пусто</div>';
+
+  const val = r => ui.sort==='goal' ? r.goalPct+'%' : ui.sort==='days' ? r.days+'/7' : r.score;
+  const top = rows.slice(0,3), order = [1,0,2].filter(i=>top[i]);
+  h += '<div class="card podium-card"><div class="podium">' + order.map(i=>`<div class="pod p${i+1}">${avatar(top[i].user)}<div class="nm">${esc(top[i].user.name.split(' ')[0])}</div><div class="sc">${val(top[i])}</div><div class="base">${['🥇','🥈','🥉'][i]}</div></div>`).join('') + '</div></div>';
+
+  h += '<div class="card">';
+  rows.forEach((r,i)=>{
+    h += `<div class="lrow ${r.user.id===S.me.id?'me':''}"><div class="rank">${i+1}</div>${avatar(r.user)}
+      <div class="lmid"><b>${esc(r.user.name)}${r.user.id===S.me.id?' <span class="badge">вы</span>':''}</b>
+        <span class="hint">цель ${r.goalPct}% · ${r.days}/7 дн${r.streak>=2?' · 🔥'+r.streak:''}</span>
+        <div class="dots">${wk.days.map(d=>`<i class="${r.dayset.has(d)?'on':''}"></i>`).join('')}</div></div>
+      <div class="lscore"><b>${val(r)}</b><span>${ui.sort==='score'?'очков':ui.sort==='goal'?'цели':'дней'}</span></div></div>`;
+  });
+  h += '</div>';
+
+  const tot = {}, who = {};
+  S.log.forEach(l=>{ if (l.date>=wk.start && l.date<=wk.end){ tot[l.exId]=(tot[l.exId]||0)+l.value; (who[l.exId]=who[l.exId]||new Set()).add(l.userId); }});
+  const keys = Object.keys(tot).sort((a,b)=>tot[b]-tot[a]);
+  if (keys.length){
+    const max = Math.max(...keys.map(k=>tot[k]));
+    h += '<h2>📊 Команда за неделю</h2><div class="card">' + keys.map(k=>{ const e=exById(k);
+      return `<div class="tot"><span style="font-size:20px">${esc(e.emoji)}</span><div style="flex:1"><div class="row"><b style="font-size:14px">${esc(e.name)}</b><span class="sp"></span><b>${num(tot[k])}</b>&nbsp;<span class="hint">${esc(e.unit)}</span></div><div class="bar" style="margin:6px 0 0"><i style="width:${tot[k]/max*100}%"></i></div><span class="hint">${who[k].size} уч.</span></div></div>`; }).join('') + '</div>';
+  }
+  h += `<div class="hint" style="text-align:center;margin:8px 16px 0">Очки = 70% × выполнение своих целей + 30% × регулярность (дни из 7)</div>`;
+  return h;
+}
+
+function renderProgress(){
+  const plans = myPlans();
+  if (!plans.length) return '<div class="card empty"><div class="big">📈</div>Добавьте упражнения, и здесь появится прогресс</div>';
+  if (!ui.ex || !plans.find(p=>p.exId===ui.ex)) ui.ex = plans[0].exId;
+  const e = exById(ui.ex);
+  const my = S.log.filter(l=>l.userId===S.me.id && l.exId===ui.ex && l.date>=CONFIG.SEASON_START);
+  const byDay = {}; my.forEach(l=>byDay[l.date]=(byDay[l.date]||0)+l.value);
+  const vals = Object.values(byDay);
+  const total = vals.reduce((a,b)=>a+b,0), best = vals.length?Math.max(...vals):0, avg = vals.length?total/vals.length:0;
+
+  let h = `<h2>🎯 Выполнение целей по неделям</h2><div class="card"><div class="chart-box"><canvas id="c1"></canvas></div></div>
+  <h2>📊 По упражнению</h2><div class="exsel">${plans.map(p=>{const x=exById(p.exId);return `<button class="${p.exId===ui.ex?'on':''}" data-act="pex" data-v="${esc(p.exId)}">${esc(x.emoji)} ${esc(x.name)}</button>`;}).join('')}</div>
+  <div class="card"><div class="hint" style="margin-bottom:6px">Последние 28 дней · пунктир — дневная норма от цели</div><div class="chart-box"><canvas id="c2"></canvas></div>
+    <div class="stats"><div class="stat"><b>${num(total)}</b><span>за сезон, ${esc(e.unit)}</span></div><div class="stat"><b>${num(best)}</b><span>лучший день</span></div><div class="stat"><b>${num(avg)}</b><span>в среднем</span></div></div></div>
+  <h2>🔥 Активность за 16 недель</h2><div class="card"><div class="heat-wrap"><div class="heat-wd">${WD.map((w,i)=>`<span>${i%2===0?w:''}</span>`).join('')}</div><div class="heat" style="flex:1">`;
+  const start = week(S.today,-15).start, n = plans.length;
+  const cnt = {}; S.log.filter(l=>l.userId===S.me.id && l.value>0).forEach(l=>{ (cnt[l.date]=cnt[l.date]||new Set()).add(l.exId); });
+  for (let i=0;i<112;i++){ const d = addDays(start,i);
+    if (d>S.today){ h+='<i class="fut"></i>'; continue; }
+    const c = cnt[d] ? cnt[d].size : 0; const lv = c===0?0:Math.min(4,Math.max(1,Math.ceil(c/n*4)));
+    h += `<i class="${lv?'l'+lv:''}" title="${fmtD(d)}"></i>`; }
+  h += `</div></div><div class="row hint" style="margin-top:8px;font-size:11px"><span class="sp"></span>меньше&nbsp;<span class="heat" style="display:flex;gap:3px"><i style="width:10px"></i><i class="l1" style="width:10px"></i><i class="l2" style="width:10px"></i><i class="l3" style="width:10px"></i><i class="l4" style="width:10px"></i></span>&nbsp;больше</div></div>`;
+  return h;
+}
+
+function drawCharts(){
+  if (!window.Chart) return;
+  const hint = getComputedStyle(document.body).getPropertyValue('--hint').trim() || '#8a93a6';
+  Chart.defaults.color = hint; Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+  const grid = 'rgba(128,128,128,.15)';
+  const weeks = [...Array(8)].map((_,i)=>week(S.today,i-7));
+  const saveSort = ui.sort; ui.sort = 'score';
+  const pcts = weeks.map(w=>{ const r = board(w).find(r=>r.user.id===S.me.id); return r?r.goalPct:0; });
+  ui.sort = saveSort;
+  const c1 = $('#c1').getContext('2d'); const g = c1.createLinearGradient(0,0,0,190); g.addColorStop(0,'rgba(213,90,38,.40)'); g.addColorStop(1,'rgba(213,90,38,0)');
+  charts.push(new Chart(c1,{type:'line',data:{labels:weeks.map(w=>fmtD(w.start)),datasets:[{data:pcts,borderColor:'#d55a26',backgroundColor:g,fill:true,tension:.35,pointRadius:4,pointBackgroundColor:'#b8925f',borderWidth:3}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+'% цели'}}},scales:{y:{min:0,max:100,ticks:{callback:v=>v+'%',stepSize:25},grid:{color:grid}},x:{grid:{display:false}}}}}));
+
+  const p = myPlans().find(p=>p.exId===ui.ex), days = [...Array(28)].map((_,i)=>addDays(S.today,i-27));
+  const byDay = {}; S.log.filter(l=>l.userId===S.me.id && l.exId===ui.ex).forEach(l=>byDay[l.date]=(byDay[l.date]||0)+l.value);
+  const data = days.map(d=>byDay[d]||0), norm = p && p.goal ? Math.round(p.goal/7*10)/10 : null;
+  const ds = [{type:'bar',data,borderRadius:6,backgroundColor:c=>norm&&c.raw>=norm?'#2f9a68':'#dd6a2b'}];
+  if (norm) ds.push({type:'line',data:days.map(()=>norm),borderColor:hint,borderDash:[6,4],borderWidth:1.5,pointRadius:0});
+  charts.push(new Chart($('#c2'),{data:{labels:days.map(fmtD),datasets:ds},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:grid}},x:{grid:{display:false},ticks:{maxTicksLimit:7,maxRotation:0}}}}}));
+}
+
+function renderEx(){
+  const mine = myPlans(), mineIds = new Set(mine.map(p=>p.exId));
+  let h = '<h2>✅ Мои упражнения</h2><div class="card">';
+  if (!mine.length) h += '<div class="hint" style="padding:6px 0">Пока ничего не выбрано. Добавьте из списка ниже</div>';
+  mine.forEach(p=>{ const e = exById(p.exId);
+    h += `<div class="erow"><div class="ico">${esc(e.emoji)}</div><div class="sp" style="min-width:0"><b>${esc(e.name)}</b><div class="hint">${esc(e.unit)} / нед</div></div>
+      <div class="stepper"><button data-act="gstep" data-ex="${esc(p.exId)}" data-v="-1">−</button><input type="number" inputmode="numeric" value="${p.goal}" data-goal="${esc(p.exId)}"><button data-act="gstep" data-ex="${esc(p.exId)}" data-v="1">+</button></div>
+      <button class="sw on" data-act="toggle" data-ex="${esc(p.exId)}" aria-label="Выключить"></button></div>`; });
+  h += '</div><h2>📚 Каталог</h2><div class="card">';
+  const rest = S.exercises.filter(e=>!mineIds.has(e.id));
+  if (!rest.length) h += '<div class="hint">Все упражнения уже выбраны</div>';
+  rest.forEach(e=>{ const author = e.createdBy && S.users.find(u=>u.id===e.createdBy);
+    h += `<div class="erow"><div class="ico">${esc(e.emoji)}</div><div class="sp"><b>${esc(e.name)}</b>${author?` <span class="badge">от ${esc(author.name.split(' ')[0])}</span>`:''}<div class="hint">${esc(e.unit)}</div></div><button class="add" data-act="activate" data-ex="${esc(e.id)}">+ Добавить</button></div>`; });
+  h += `</div><h2>✨ Своё упражнение</h2><div class="card">
+    <input id="nx-name" maxlength="40" placeholder="Название, например «Скакалка»">
+    <div class="emojis">${EMOJIS.map(x=>`<button class="${x===ui.newEmoji?'on':''}" data-act="emoji" data-v="${x}">${x}</button>`).join('')}</div>
+    <div class="form-grid"><select id="nx-unit">${UNITS.map(u=>`<option>${u}</option>`).join('')}</select><input id="nx-goal" type="number" inputmode="numeric" placeholder="Цель на неделю"></div>
+    <button class="btn wide" style="margin-top:10px" data-act="create">Создать и добавить себе</button>
+    <div class="hint" style="margin-top:8px">Упражнение появится в каталоге у всех участников</div></div>`;
+  return h;
+}
+
+/* ====== события ====== */
+let goalTimers = {};
+function savePlan(exId, goal, active){
+  call('setPlan',{exId, goal, active}, ()=>{
+    const p = S.plans.find(p=>p.userId===S.me.id && p.exId===exId);
+    if (p){ p.goal=goal; p.active=active; } else S.plans.push({userId:S.me.id, exId, goal, active});
+  });
+}
+function addLog(exId, value){
+  if (!(value>0)) return toast('Введите число больше нуля');
+  haptic();
+  call('log',{date:ui.date, exId, value}, ()=>S.log.push({id:'tmp'+Date.now(), date:ui.date, userId:S.me.id, exId, value}))
+    .then(()=>{ const el = document.getElementById('t-'+exId); if (el) el.classList.add('pop'); });
+}
+
+document.addEventListener('click', e=>{
+  const b = e.target.closest('[data-act]'); if (!b || !S) return;
+  const a = b.dataset.act, v = b.dataset.v, ex = b.dataset.ex;
+  if (a==='tab'){ ui.tab=v; ui.weekOff=0; render(); scrollTo(0,0); }
+  else if (a==='date'){ ui.date=v; render(); }
+  else if (a==='add') addLog(ex, +v);
+  else if (a==='addc'){ const inp = document.getElementById('in-'+ex); addLog(ex, parseFloat(String(inp.value).replace(',','.'))); }
+  else if (a==='del') call('deleteEntry',{entryId:v}, ()=>{ S.log = S.log.filter(l=>l.id!==v); });
+  else if (a==='wk'){ ui.weekOff = Math.min(0, ui.weekOff + +v); render(); }
+  else if (a==='sort'){ ui.sort=v; render(); }
+  else if (a==='pex'){ ui.ex=v; render(); }
+  else if (a==='toggle'){ const p = S.plans.find(p=>p.userId===S.me.id && p.exId===ex); savePlan(ex, p?p.goal:0, false); }
+  else if (a==='activate'){ const x = exById(ex); const old = S.plans.find(p=>p.userId===S.me.id && p.exId===ex); savePlan(ex, old&&old.goal?old.goal:(DEF_GOAL[x.unit]||100), true); haptic('ok'); }
+  else if (a==='gstep'){
+    const inp = document.querySelector(`[data-goal="${CSS.escape(ex)}"]`); const unit = exById(ex).unit;
+    const step = unit==='км'?1:unit==='мин'?10:unit==='сек'?60:unit==='м'?500:10;
+    inp.value = Math.max(0, (+inp.value||0) + step*(+v)); haptic();
+    clearTimeout(goalTimers[ex]); goalTimers[ex] = setTimeout(()=>savePlan(ex, +inp.value, true), 700);
+  }
+  else if (a==='emoji'){ ui.newEmoji=v; document.querySelectorAll('.emojis button').forEach(x=>x.classList.toggle('on', x.dataset.v===v)); }
+  else if (a==='create'){
+    const name = $('#nx-name').value.trim(), unit = $('#nx-unit').value, goal = +$('#nx-goal').value || DEF_GOAL[unit];
+    if (name.length<2) return toast('Введите название');
+    haptic('ok'); call('addExercise',{name, unit, emoji:ui.newEmoji, goal}).then(()=>toast('Добавлено: '+name));
+  }
+});
+document.addEventListener('change', e=>{
+  const ex = e.target.dataset && e.target.dataset.goal;
+  if (ex) savePlan(ex, Math.max(0, +e.target.value||0), true);
+});
+document.addEventListener('keydown', e=>{
+  if (e.key==='Enter' && e.target.id && e.target.id.startsWith('in-')) addLog(e.target.id.slice(3), parseFloat(String(e.target.value).replace(',','.')));
+});
+
+/* ====== демо-данные (только вне Telegram) ====== */
+let DB = null;
+function rng(seed){ return ()=>{ seed|=0; seed=seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function demoData(){
+  const today = new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Moscow'});
+  const ex = EX_DEFAULTS.map(([id,name,unit,emoji])=>({id,name,unit,emoji,createdBy:''}));
+  ex.push({id:'c1',name:'Скакалка',unit:'мин',emoji:'🪢',createdBy:'3'});
+  const users = [{id:'1',name:'Антон'},{id:'2',name:'Илья'},{id:'3',name:'Маша'},{id:'4',name:'Дима'}];
+  const plans = [['1','pushups',210],['1','pullups',105],['1','wsquats',175],['1','biceps',280],
+    ['2','pullups',150],['2','pushups',250],['2','wallsit',1200],['2','abs',250],['2','squats',200],
+    ['3','plank',900],['3','balance',600],['3','climber',200],['3','superman',200],['3','c1',60],
+    ['4','pushups',200],['4','revpush',200],['4','sltilt',200],['4','squats',150]]
+    .map(([userId,exId,goal])=>({userId,exId,goal,active:true}));
+  const log = []; const R = rng(42); let k = 0;
+  const push = (date,userId,exId,value)=>{ if (value>0 && date<=today) log.push({id:'d'+(k++),date,userId,exId,value}); };
+  const real = {pushups:[30,30,40,30,40,30,30,0,30,0,30,30,30,50,0,30,30,0,0,30,30,0,30],
+    pullups:[10,0,45,10,10,25,15,0,10,0,10,25,15,0,10,10,10,15,25,15,32,15,15],
+    wsquats:[20,20,20,20,10,30,20,30,30,0,30,30,30,20,20,0,20,20,30,20,20,0,30],
+    biceps:[30,40,40,30,40,40,30,50,40,50,30,40,50,40,30,30,30,30,40,50,80,0,40]};
+  const p = {'2':.8,'3':.65,'4':.5,'1':.75};
+  for (let i=90;i>=0;i--){ const d = addDays(today,-i);
+    for (const u of users){
+      if (u.id==='1' && d>='2026-10-01' && d<='2026-10-23'){ const j = +d.slice(8)-1; Object.keys(real).forEach(x=>push(d,'1',x,real[x][j])); continue; }
+      if (R()>p[u.id]) continue;
+      plans.filter(q=>q.userId===u.id).forEach(q=>{ if (R()<.85){ let v = q.goal/7*(0.5+R()); v = q.goal>=100 ? Math.round(v/5)*5 : Math.round(v*10)/10; push(d,u.id,q.exId,v); } });
+    }
+  }
+  return {today, me:users[0], users, exercises:ex, plans, log};
+}
+function demoApi(action, b){
+  if (!DB) DB = demoData();
+  const me = DB.me.id;
+  if (action==='log') DB.log.push({id:'d'+Date.now(), date:b.date, userId:me, exId:b.exId, value:+b.value});
+  if (action==='deleteEntry') DB.log = DB.log.filter(l=>l.id!==b.entryId);
+  if (action==='setPlan'){ const p = DB.plans.find(p=>p.userId===me && p.exId===b.exId); if (p){ p.goal=b.goal; p.active=b.active; } else DB.plans.push({userId:me, exId:b.exId, goal:b.goal, active:b.active}); }
+  if (action==='addExercise'){ let e = DB.exercises.find(e=>e.name.toLowerCase()===b.name.toLowerCase());
+    if (!e){ e = {id:'c'+Date.now().toString(36), name:b.name, unit:b.unit, emoji:b.emoji, createdBy:me}; DB.exercises.push(e); }
+    demoApi('setPlan',{exId:e.id, goal:b.goal, active:true}); }
+  return new Promise(r=>setTimeout(()=>r(JSON.parse(JSON.stringify(DB))), 120));
+}
+
+/* ====== старт ====== */
+(async function init(){
+  const dark = tg && tg.colorScheme ? tg.colorScheme==='dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  const fav = document.createElement('link'); fav.rel='icon'; fav.href=LOGO; document.head.appendChild(fav);
+  if (tg){ try { tg.ready(); tg.expand(); const c = dark?'#121419':'#efece6'; tg.setHeaderColor && tg.setHeaderColor(c); tg.setBackgroundColor && tg.setBackgroundColor(c); } catch(e){} }
+  if (!DEMO && CONFIG.API_URL.indexOf('PASTE_')===0){ $('#app').innerHTML = '<div class="card empty"><div class="big">⚙️</div>Не указан API_URL в index.html</div>'; return; }
+  try { S = await api('bootstrap'); ui.date = S.today; render(); }
+  catch(e){ $('#app').innerHTML = `<div class="card empty"><div class="big">⚠️</div>Не удалось загрузить данные<br><span class="hint">${esc(e.message)}</span><br><br><button class="btn" onclick="location.reload()">Повторить</button></div>`; }
+})();
+</script>
+</body>
+</html>
