@@ -207,6 +207,8 @@ body.syncing .topbar .brand::after,body.syncing .hero-top .brand::after{content:
 .card.ex .chips{margin-top:8px}
 
 /* участник, ачивки */
+.seg.mode{margin-bottom:10px}
+.pod{cursor:pointer}
 .av{position:relative;overflow:hidden}
 .av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .lrow{cursor:pointer}
@@ -271,14 +273,16 @@ function monthStats(ym){
   const from = ym+'-01', last = addDays(addDays(from, 32).slice(0,8)+'01', -1), to = last < S.today ? last : S.today;
   const unit = {}; S.exercises.forEach(x=>unit[x.id]=x.unit);
   const res = {users:{}, iron:null, mini:null, from, to, done: last < S.today};
+  const arch = (S.archive||[]).filter(a=>a.month===ym);   // цели прошлого месяца, зафиксированные 1-го числа
+  const src = arch.length ? arch.map(a=>({userId:a.userId, exId:a.exId, goal:a.goal, active:true})) : S.plans;
   for (const u of S.users){
     const logs = S.log.filter(l=>l.userId===u.id && l.date>=from && l.date<=to && l.value>0);
     const sums = {}; logs.forEach(l=>sums[l.exId]=(sums[l.exId]||0)+l.value);
-    const plans = S.plans.filter(p=>p.userId===u.id && p.active && p.goal>0)
+    const plans = src.filter(p=>p.userId===u.id && p.active && p.goal>0)
       .map(p=>({exId:p.exId, goal:p.goal, sum:sums[p.exId]||0, pct:(sums[p.exId]||0)/p.goal}));
     const reps = logs.filter(l=>unit[l.exId]==='повт').reduce((a,l)=>a+l.value,0);
     const ok = plans.length>=MIN_EX;
-    res.users[u.id] = { reps, active: logs.length>0, sums, plans,
+    res.users[u.id] = { reps, active: logs.length>0, sums, plans, days: new Set(logs.map(l=>l.date)).size,
       plan: ok && plans.every(p=>p.pct>=1), mega: ok && plans.every(p=>p.pct>=1.2),
       pct: Math.round(plans.reduce((a,p)=>a+Math.min(1,p.pct),0)/Math.max(MIN_EX, plans.length)*100) };
   }
@@ -479,9 +483,34 @@ function renderToday(){
   return h;
 }
 
+function boardModes(){ return `<div class="seg mode">${[['week','Неделя'],['month','Месяц']].map(([k,t])=>`<button class="${(ui.bmode||'week')===k?'on':''}" data-act="bmode" data-v="${k}">${t}</button>`).join('')}</div>`; }
+function seasonMonths(){ const out = []; let ym = CONFIG.SEASON_START.slice(0,7); while (ym <= S.today.slice(0,7)){ out.push(ym); ym = addDays(ym+'-01', 32).slice(0,7); } return out; }
+function renderMonth(){
+  const months = seasonMonths(); if (!ui.ym || !months.includes(ui.ym)) ui.ym = months[months.length-1];
+  const ym = ui.ym, i = months.indexOf(ym), ms = monthStats(ym), mi = +ym.slice(5,7)-1;
+  let h = boardModes() + `<div class="wk"><button data-act="ym" data-v="${months[i-1]||''}" ${i>0?'':'disabled'}>‹</button><div style="text-align:center"><b>${MONTHS[mi][0].toUpperCase()+MONTHS[mi].slice(1)} ${ym.slice(0,4)}</b><div class="hint">${ms.done?'итоги месяца':'идёт сейчас · до '+fmtD(ms.from.slice(0,8)+String(new Date(Date.UTC(+ym.slice(0,4), mi+1, 0)).getUTCDate()).padStart(2,'0'))}</div></div><button data-act="ym" data-v="${months[i+1]||''}" ${i<months.length-1?'':'disabled'}>›</button></div>`;
+  const rows = S.users.map(u=>({user:u, ...ms.users[u.id]})).filter(r=>r.active || r.pct>0).sort((a,b)=>b.pct-a.pct || b.reps-a.reps);
+  if (!rows.length) return h + '<div class="card empty"><div class="big">🗓</div>В этом месяце отметок нет</div>';
+  const top = rows.slice(0,3), order = [1,0,2].filter(k=>top[k]);
+  h += '<div class="card podium-card"><div class="podium">' + order.map(k=>`<div class="pod p${k+1}" data-act="user" data-v="${esc(top[k].user.id)}">${avatar(top[k].user)}<div class="nm">${esc(top[k].user.name.split(' ')[0])}</div><div class="sc">${top[k].pct}%</div><div class="base">${['🥇','🥈','🥉'][k]}</div></div>`).join('') + '</div></div>';
+  h += '<div class="hint" style="margin:0 4px 6px">Место — по % выполнения месячных целей. Нажмите на участника</div><div class="card">';
+  rows.forEach((r,k)=>{ const bd = badgesOf(r.user.id, ms).map(b=>BADGES[b].e).join('');
+    h += `<div class="lrow ${r.user.id===S.me.id?'me':''}" data-act="user" data-v="${esc(r.user.id)}"><div class="rank">${k+1}</div>${avatar(r.user)}
+      <div class="lmid"><b>${esc(r.user.name)}${r.user.id===S.me.id?' <span class="badge">вы</span>':''}${bd?' <span class="bdg">'+bd+'</span>':''}</b>
+        <span class="hint">${num(r.reps)} повт · ${r.days} дн. с тренировками</span></div>
+      <div class="lscore"><b>${r.pct}%</b><span>плана</span></div></div>`; });
+  h += '</div>' + achBlock(ms, ym);
+  return h;
+}
+function achBlock(ms, ym){
+  return `<h2>🏅 Ачивки ${MONTHS_GEN[+ym.slice(5,7)-1]}${ms.done?'':' · на сегодня'}</h2><div class="card">` + ['plan','mega','iron','mini'].map(k=>{
+    const who = S.users.filter(u=>badgesOf(u.id, ms).includes(k));
+    return `<div class="ach"><span class="ach-e">${BADGES[k].e}</span><div class="lmid"><b>${BADGES[k].t}</b><span class="hint">${BADGES[k].d}</span></div><span class="ach-who">${who.length?who.map(u=>avatar(u)).join(''):'<span class="hint">—</span>'}</span></div>`; }).join('') + '</div>';
+}
 function renderBoard(){
+  if (ui.bmode==='month') return renderMonth();
   const wk = week(S.today, ui.weekOff), rows = board(wk);
-  let h = `<div class="wk"><button data-act="wk" data-v="-1">‹</button><div style="text-align:center"><b>${ui.weekOff===0?'Эта неделя':ui.weekOff===-1?'Прошлая неделя':'Неделя'}</b><div class="hint">${fmtD(wk.start)} – ${fmtD(wk.end)}</div></div><button data-act="wk" data-v="1" ${ui.weekOff>=0?'disabled':''}>›</button></div>
+  let h = boardModes() + `<div class="wk"><button data-act="wk" data-v="-1">‹</button><div style="text-align:center"><b>${ui.weekOff===0?'Эта неделя':ui.weekOff===-1?'Прошлая неделя':'Неделя'}</b><div class="hint">${fmtD(wk.start)} – ${fmtD(wk.end)}</div></div><button data-act="wk" data-v="1" ${ui.weekOff>=0?'disabled':''}>›</button></div>
   <div class="seg">${[['score','Очки'],['goal','% цели'],['days','Дни']].map(([k,t])=>`<button class="${ui.sort===k?'on':''}" data-act="sort" data-v="${k}">${t}</button>`).join('')}</div>`;
   if (!rows.length) return h + '<div class="card empty"><div class="big">🏁</div>На этой неделе пока пусто</div>';
 
@@ -501,30 +530,29 @@ function renderBoard(){
   });
   h += '</div>';
 
-  h += `<h2>🏅 Ачивки ${MONTHS_GEN[+S.today.slice(5,7)-1]}</h2><div class="card">` + ['plan','mega','iron','mini'].map(k=>{
-    const who = S.users.filter(u=>badgesOf(u.id, ms).includes(k));
-    return `<div class="ach"><span class="ach-e">${BADGES[k].e}</span><div class="lmid"><b>${BADGES[k].t}</b><span class="hint">${BADGES[k].d}</span></div><span class="ach-who">${who.length?who.map(u=>avatar(u)).join(''):'<span class="hint">—</span>'}</span></div>`; }).join('') + '</div>';
+  h += achBlock(ms, S.today.slice(0,7));
   h += `<div class="hint" style="text-align:center;margin:8px 16px 0">Очки = 70% × выполнение недельной нормы (месячная цель ÷ дней в месяце × 7, минимум 5 упражнений) + 30% × регулярность (дни из 7). Железный и Мини нубас — по сумме повторений за месяц</div>`;
   return h;
 }
 
 function renderUser(uid){
   const u = S.users.find(x=>x.id===uid); if (!u) return '';
-  const ym = S.today.slice(0,7), ms = monthStats(ym), x = ms.users[uid] || {plans:[], sums:{}, reps:0, pct:0};
+  const ym = (ui.tab==='board' && ui.bmode==='month' && ui.ym) || S.today.slice(0,7), cur = ym===S.today.slice(0,7);
+  const ms = monthStats(ym), x = ms.users[uid] || {plans:[], sums:{}, reps:0, pct:0};
   const wk = week(S.today,0), r = board(wk).find(r=>r.user.id===uid);
   const wsum = id => S.log.filter(l=>l.userId===uid && l.exId===id && l.date>=wk.start && l.date<=wk.end).reduce((a,l)=>a+l.value,0);
   const now = badgesOf(uid, ms), hist = seasonBadges(uid);
   const plans = x.plans.slice().sort((a,b)=>b.pct-a.pct);
   const missing = Math.max(0, MIN_EX - plans.length);
   return `<div class="sheet-bg" data-act="close"></div><div class="sheet">
-    <div class="sheet-h">${avatar(u)}<div class="lmid"><b>${esc(u.name)}</b><span class="hint">${u.username?'@'+esc(u.username)+' · ':''}${r?r.score+' очк. за неделю · '+r.days+'/7 дн':'на этой неделе без отметок'}</span></div><button class="x" data-act="close">✕</button></div>
+    <div class="sheet-h">${avatar(u)}<div class="lmid"><b>${esc(u.name)}</b><span class="hint">${u.username?'@'+esc(u.username)+' · ':''}${cur ? (r?r.score+' очк. за неделю · '+r.days+'/7 дн':'на этой неделе без отметок') : MONTHS[+ym.slice(5,7)-1]+' '+ym.slice(0,4)+' · '+(x.days||0)+' дн. с тренировками'}</span></div><button class="x" data-act="close">✕</button></div>
     <div class="stats"><div class="stat"><b>${x.pct}%</b><span>цели ${MONTHS_GEN[+ym.slice(5,7)-1]}</span></div><div class="stat"><b>${num(x.reps)}</b><span>повторений</span></div><div class="stat"><b>${streak(uid)}</b><span>дней подряд</span></div></div>
     <div class="chips">${['plan','mega','iron','mini'].map(k=>`<span class="chip bchip ${now.includes(k)?'on':''}" title="${esc(BADGES[k].d)}">${BADGES[k].e} ${BADGES[k].t}${hist[k]?' ×'+hist[k]:''}</span>`).join('')}</div>
-    <h2 style="margin:14px 0 6px">Цели на месяц</h2>
+    <h2 style="margin:14px 0 6px">Цели на ${MONTHS[+ym.slice(5,7)-1]}</h2>
     ${plans.length ? plans.map(p=>{ const e = exById(p.exId), pc = Math.round(p.pct*100);
       return `<div class="urow"><span class="ico-s">${esc(e.emoji)}</span><div class="lmid"><div class="row"><b>${esc(e.name)}</b><span class="sp"></span><b class="${pc>=120?'mega':pc>=100?'okc':''}">${pc}%</b></div>
         <div class="bar ${pc>=100?'full':''}"><i style="width:${Math.min(100,pc)}%"></i></div>
-        <span class="hint">${num(p.sum)} / ${num(p.goal)} ${esc(e.unit)} · неделя ${num(wsum(p.exId))}</span></div></div>`; }).join('')
+        <span class="hint">${num(p.sum)} / ${num(p.goal)} ${esc(e.unit)}${cur?' · неделя '+num(wsum(p.exId)):''}</span></div></div>`; }).join('')
       : '<div class="hint">Цели ещё не поставлены</div>'}
     ${missing?`<div class="warn">Не хватает упражнений: ${missing}. Пока их нет, они считаются как 0%.</div>`:''}
   </div>`;
@@ -640,6 +668,8 @@ document.addEventListener('click', e=>{
   if (a==='tab'){ ui.tab=v; ui.user=null; ui.weekOff=0; render(); scrollTo(0,0); }
   else if (a==='date'){ ui.date=v; render(); }
   else if (a==='user'){ ui.user=v; haptic(); render(); }
+  else if (a==='bmode'){ ui.bmode=v; render(); }
+  else if (a==='ym'){ if (v){ ui.ym=v; render(); } }
   else if (a==='close'){ ui.user=null; render(); }
   else if (a==='exp'){ ui.open = ui.open===ex ? null : ex; render(); }
   else if (a==='add') addLog(ex, +v);
@@ -705,7 +735,7 @@ function demoData(){
       plans.filter(q=>q.userId===u.id).forEach(q=>{ if (R()<.85){ let v = q.goal/30*(0.5+R()); v = q.goal>=100 ? Math.round(v/5)*5 : Math.round(v*10)/10; push(d,u.id,q.exId,v); } });
     }
   }
-  return {today, me:users[0], users, exercises:ex, plans, log};
+  return {today, me:users[0], users, exercises:ex, plans, log, archive:[]};
 }
 function demoApi(action, b){
   if (!DB) DB = demoData();
